@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	mainFilePath   = flag.String("main", "", "the main file csv path")
-	cybusFilePsath = flag.String("cybus", "", "the cybus csv")
+	mainFilePath  = flag.String("main", "", "the main file csv path")
+	cybusFilePath = flag.String("cybus", "", "the cybus csv")
+	outFilePath   = flag.String("out", "out.xlsx", "the output file (default: out.xlsx)")
 )
 
 func init() {
@@ -22,7 +23,7 @@ func init() {
 	if *mainFilePath == "" {
 		panic("must provide the main file path")
 	}
-	if *cybusFilePsath == "" {
+	if *cybusFilePath == "" {
 		panic("must provide the cibus file path")
 	}
 
@@ -125,11 +126,11 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := createSQLTables(*mainFilePath, *cybusFilePsath, db); err != nil {
+	if err := createSQLTables(*mainFilePath, *cybusFilePath, db); err != nil {
 		log.Panic(err)
 	}
 
-	if err := cretaeOutpuFile("out.xlsx", db); err != nil {
+	if err := cretaeOutpuFile(*outFilePath, db); err != nil {
 		log.Panic(err)
 	}
 
