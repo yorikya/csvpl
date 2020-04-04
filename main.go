@@ -53,7 +53,7 @@ func parseMain(path string, db *sql.DB) error {
 				log.Println("insert main error:", err)
 				continue
 			}
-			log.Println("exec query:", q)
+			// log.Println("exec query:", q)
 		}
 	}
 	return nil
@@ -68,8 +68,8 @@ func parseBase(path string, db *sql.DB) error {
 	rows := f.GetRows("Sheet1")
 	for _, row := range rows {
 		// code TEXT, site_code TEXT, site TEXT, employe_id TEXT, kibutz_id TEXT, launch_site_id TEXT, price TEXT, first_name TEXT, last_name TEXT
-		q := fmt.Sprintf(`INSERT INTO base (code, site_code, site, employe_id, kibutz_id, launch_site_id, price, first_name, last_name) VALUES ("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s");`,
-			row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8])
+		q := fmt.Sprintf(`INSERT INTO base (code, site_code, site, employe_id, kibutz_id, launch_site_id, price, first_name, last_name, full_name) VALUES ("%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s", "%s");`,
+			row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], fmt.Sprintf("%s %s", row[7], row[8]))
 		if _, err := db.Exec(q); err != nil {
 			log.Println("insert cybus error:", err)
 			continue
@@ -112,7 +112,7 @@ func parseCybus(path string, db *sql.DB) error {
 func initDBSQL(db *sql.DB) error {
 	batch := []string{
 		`CREATE TABLE main ( account TEXT, enter_noon TEXT, to_date TEXT, from_date TEXT, evning TEXT, noon TEXT, morning TEXT, amount TEXT, budget_num TEXT, recepie_id TEXT, name TEXT, budget_name TEXT, departament TEXT, first_name TEXT, last_name TEXT);`,
-		`CREATE TABLE base ( code TEXT, site_code TEXT, site TEXT, employe_id TEXT, kibutz_id TEXT, launch_site_id TEXT, price TEXT, first_name TEXT, last_name TEXT);`,
+		`CREATE TABLE base ( code TEXT, site_code TEXT, site TEXT, employe_id TEXT, kibutz_id TEXT, launch_site_id TEXT, price TEXT, first_name TEXT, last_name TEXT, full_name TEXT);`,
 		`CREATE TABLE cybus (group_number TEXT, company TEXT, group_name TEXT, departament TEXT, full_name TEXT, employe_id TEXT, total_full TEXTS, total TEXT, company_part TEXT, company_part_amount TEXT, employe_part TEXT, employe_part_amount TEXT, deal_amount TEXT, deal_amount_copy TEXT, first_name TEXT, last_name TEXT, id TEXT);`,
 	}
 	for _, b := range batch {
@@ -150,40 +150,54 @@ func cretaeOutpuFile(path string, db *sql.DB) error {
 	for k, v := range hedaer {
 		f.SetCellValue("Sheet1", k, v)
 	}
-	rows, err := db.Query(`SELECT main.recepie_id, main.name, main.amount, main.noon FROM main JOIN `)
+	// code, site_code, site, employe_id, kibutz_id, launch_site_id, price, first_name, last_name
+	rows, err := db.Query(`SELECT base.code, base.site_code, base.site, base.employe_id, base.kibutz_id, base.launch_site_id, base.price, base.first_name, base.last_name, main.amount, main.noon FROM base
+	JOIN main ON base.full_name = main.name`)
 	if err != nil {
 		return err
 	}
 
 	i := 2
 	for rows.Next() {
-		var recepie_id, name, amount, noon string
-		if err := rows.Scan(&recepie_id, &name, &amount, &noon); err != nil {
+		var code, site_code, site, empl_id, kibutz_id, lunch_site_id, price, first_name, last_name, amount, noon string
+		if err := rows.Scan(&code, &site_code, &site, &empl_id, &kibutz_id, &lunch_site_id, &price, &first_name, &last_name, &amount, &noon); err != nil {
 			log.Println("Get an error when scan row, error:", err)
 			continue
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i), recepie_id)
-		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i), name)
-		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i), "24")
-		f.SetCellValue("Sheet1", fmt.Sprintf("D%d", i), noon)
+		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i), code)
+		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i), site_code)
+		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i), site)
+		f.SetCellValue("Sheet1", fmt.Sprintf("D%d", i), empl_id)
+		f.SetCellValue("Sheet1", fmt.Sprintf("E%d", i), kibutz_id)
+		f.SetCellValue("Sheet1", fmt.Sprintf("F%d", i), lunch_site_id)
+		f.SetCellValue("Sheet1", fmt.Sprintf("G%d", i), price)
+		f.SetCellValue("Sheet1", fmt.Sprintf("H%d", i), noon)
+		f.SetCellValue("Sheet1", fmt.Sprintf("I%d", i), first_name)
+		f.SetCellValue("Sheet1", fmt.Sprintf("J%d", i), last_name)
 		noonInt, err := strconv.ParseInt(noon, 10, 64)
 		if err != nil {
 			log.Println("failed to parse noon lunches nuber, error", err)
 		}
-		f.SetCellValue("Sheet1", fmt.Sprintf("E%d", i), noonInt*24)
+		priceInt, err := strconv.ParseInt(price, 10, 64)
+		if err != nil {
+			log.Println("failed to parse price, error", err)
+		}
+		totalCompany := noonInt * priceInt
+		f.SetCellValue("Sheet1", fmt.Sprintf("K%d", i), totalCompany)
 		totalCharge, err := strconv.ParseFloat(amount, 64)
 		if err != nil {
-			log.Println("failed to parse flot total charge,", err)
-		}
-		c := totalCharge - float64(noonInt*24)
-		if c > 0 {
-			f.SetCellValue("Sheet1", fmt.Sprintf("F%d", i), fmt.Sprintf("%.2f", c))
-		} else {
-			f.SetCellValue("Sheet1", fmt.Sprintf("F%d", i), "")
+			log.Println("failed to parse amount, error", err)
 		}
 
-		f.SetCellValue("Sheet1", fmt.Sprintf("G%d", i), amount)
+		if c := totalCharge - float64(totalCompany); c > 0 {
+			f.SetCellValue("Sheet1", fmt.Sprintf("L%d", i), fmt.Sprintf("%.2f", c))
+		} else {
+			f.SetCellValue("Sheet1", fmt.Sprintf("L%d", i), "")
+		}
+
+		f.SetCellValue("Sheet1", fmt.Sprintf("M%d", i), amount)
 		i++
+		// log.Println("the row:", code, site_code, site, empl_id, kibutz_id, lunch_site_id, price, first_name, last_name, amount, noon)
 	}
 	return f.SaveAs(path)
 }
