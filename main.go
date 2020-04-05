@@ -142,8 +142,23 @@ func createSQLTables(basePath, mainPath, cybusPath string, db *sql.DB) error {
 	return nil
 }
 
+func logMissingUsers(db *sql.DB) {
+	rows, err := db.Query(`SELECT main.name FROM main;`)
+	if err != nil {
+		log.Println("failed to find missing users, error:", err)
+	}
+	for rows.Next() {
+		var user string
+		if err := rows.Scan(&user); err != nil {
+			log.Println("Get an error when scan row, error:", err)
+			continue
+		}
+		log.Println("missing user:", user)
+	}
+
+}
+
 func cretaeOutpuFile(path string, db *sql.DB) error {
-	log.Println("create output file", path)
 	hedaer := map[string]string{"A1": "employee_id", "B1": "full_name", "C1": "launch_price", "D1": "lunch_amount", "E1": "company_charge", "F1": "employe_charge", "G1": "lunch_total"}
 	// values := map[string]int{"B2": 2, "C2": 3, "D2": 3, "B3": 5, "C3": 2, "D3": 4, "B4": 6, "C4": 7, "D4": 8}
 	f := excelize.NewFile()
@@ -151,19 +166,21 @@ func cretaeOutpuFile(path string, db *sql.DB) error {
 		f.SetCellValue("Sheet1", k, v)
 	}
 	// code, site_code, site, employe_id, kibutz_id, launch_site_id, price, first_name, last_name
-	rows, err := db.Query(`SELECT base.code, base.site_code, base.site, base.employe_id, base.kibutz_id, base.launch_site_id, base.price, base.first_name, base.last_name, main.amount, main.noon FROM base
+	rows, err := db.Query(`SELECT base.full_name, base.code, base.site_code, base.site, base.employe_id, base.kibutz_id, base.launch_site_id, base.price, base.first_name, base.last_name, main.amount, main.noon FROM base
 	JOIN main ON base.full_name = main.name`)
 	if err != nil {
 		return err
 	}
 
 	i := 2
+	users := []string{}
 	for rows.Next() {
-		var code, site_code, site, empl_id, kibutz_id, lunch_site_id, price, first_name, last_name, amount, noon string
-		if err := rows.Scan(&code, &site_code, &site, &empl_id, &kibutz_id, &lunch_site_id, &price, &first_name, &last_name, &amount, &noon); err != nil {
+		var full_name, code, site_code, site, empl_id, kibutz_id, lunch_site_id, price, first_name, last_name, amount, noon string
+		if err := rows.Scan(&full_name, &code, &site_code, &site, &empl_id, &kibutz_id, &lunch_site_id, &price, &first_name, &last_name, &amount, &noon); err != nil {
 			log.Println("Get an error when scan row, error:", err)
 			continue
 		}
+		users = append(users, full_name)
 		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", i), code)
 		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", i), site_code)
 		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", i), site)
@@ -174,22 +191,22 @@ func cretaeOutpuFile(path string, db *sql.DB) error {
 		f.SetCellValue("Sheet1", fmt.Sprintf("H%d", i), noon)
 		f.SetCellValue("Sheet1", fmt.Sprintf("I%d", i), first_name)
 		f.SetCellValue("Sheet1", fmt.Sprintf("J%d", i), last_name)
-		noonInt, err := strconv.ParseInt(noon, 10, 64)
+		noonFloat, err := strconv.ParseFloat(noon, 64)
 		if err != nil {
 			log.Println("failed to parse noon lunches nuber, error", err)
 		}
-		priceInt, err := strconv.ParseInt(price, 10, 64)
+		priceFloat, err := strconv.ParseFloat(price, 64)
 		if err != nil {
-			log.Println("failed to parse price, error", err)
+			log.Printf("failed to parse price, for name: %s, %s, error: %s", first_name, last_name, err)
 		}
-		totalCompany := noonInt * priceInt
+		totalCompany := noonFloat * priceFloat
 		f.SetCellValue("Sheet1", fmt.Sprintf("K%d", i), totalCompany)
 		totalCharge, err := strconv.ParseFloat(amount, 64)
 		if err != nil {
 			log.Println("failed to parse amount, error", err)
 		}
 
-		if c := totalCharge - float64(totalCompany); c > 0 {
+		if c := totalCharge - totalCompany; c > 0 {
 			f.SetCellValue("Sheet1", fmt.Sprintf("L%d", i), fmt.Sprintf("%.2f", c))
 		} else {
 			f.SetCellValue("Sheet1", fmt.Sprintf("L%d", i), "")
@@ -199,7 +216,36 @@ func cretaeOutpuFile(path string, db *sql.DB) error {
 		i++
 		// log.Println("the row:", code, site_code, site, empl_id, kibutz_id, lunch_site_id, price, first_name, last_name, amount, noon)
 	}
+
+	rows, err = db.Query(`SELECT main.name FROM main;`)
+	if err != nil {
+		log.Println("failed to find missing users, error:", err)
+	}
+
+	missingUsers := []string{}
+	for rows.Next() {
+		var user string
+		if err := rows.Scan(&user); err != nil {
+			log.Println("Get an error when scan row, error:", err)
+			continue
+		}
+		if !contain(users, user) {
+			missingUsers = append(missingUsers, user)
+		}
+
+	}
+	log.Printf("create output file %s, with %d records", path, i-1)
+	log.Printf("missing users in base file, users: %+v", missingUsers)
 	return f.SaveAs(path)
+}
+
+func contain(col []string, key string) bool {
+	for _, k := range col {
+		if k == key {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
