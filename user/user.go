@@ -24,3 +24,22 @@ func NewUser(departament, name, budgetID, luncherID string,
 		ChargePrice:     totalPrice - float64(totalCompany),
 	}
 }
+
+type UserMetadata struct {
+	Code, SiteCode, Site, EmployeeIDPlasgad, EmployeeIDFoodSite, Column6, LastName, FirstName string
+	Price                                                                                     int
+}
+
+func NewUserMetadata(code, siteCode, site, employeeIDPlasgad, employeeIDFoodSite, column6, lastName, firstName string, price int) *UserMetadata {
+	return &UserMetadata{
+		Code:               code,
+		SiteCode:           siteCode,
+		Site:               site,
+		EmployeeIDPlasgad:  employeeIDPlasgad,
+		EmployeeIDFoodSite: employeeIDFoodSite,
+		Column6:            column6,
+		LastName:           lastName,
+		FirstName:          firstName,
+		Price:              price,
+	}
+}
