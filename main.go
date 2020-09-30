@@ -21,7 +21,7 @@ func parseLunches(path string) []*user.User {
 	}
 
 	if sheet1 := xlFile.GetSheet(0); sheet1 != nil {
-		users := make([]*user.User, sheet1.MaxRow)
+		users := make([]*user.User, sheet1.MaxRow+1)
 		fmt.Println("Total Lines ", sheet1.MaxRow, sheet1.Name)
 		for i := 1; i <= (int(sheet1.MaxRow)); i++ {
 			u, err := parsers.ParseXSLRowToUser(sheet1.Row(i))
