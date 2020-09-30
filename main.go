@@ -42,7 +42,7 @@ var metadataFilePath = flag.String("metadata", "resources/metadata.xlsx", "metad
 func main() {
 	flag.Parse()
 	users := parseLunches(*lunchesFilePath)
-	// reports.GenerateLunchReport("lunchreport.xls", users)
+	reports.GenerateLunchReport("lunchreport.xls", users)
 
 	reports.GenerateFinalReport("finalreport.xlsx", *metadataFilePath, users)
 }
